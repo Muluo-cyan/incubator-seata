@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -17,6 +18,12 @@
 package org.apache.seata.server.auth.config;
 
 import com.google.common.base.Predicates;
+=======
+package org.apache.seata.server.auth.config;
+
+import com.google.common.base.Predicates;
+import org.apache.seata.console.config.ConsoleSecurityConfig;
+>>>>>>> dcbba42f0 (feature: support swagger)
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
