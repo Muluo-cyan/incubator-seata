@@ -16,12 +16,15 @@
  */
 package org.apache.seata.console.controller;
 
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
 import org.apache.seata.common.result.Code;
 import org.apache.seata.common.result.SingleResult;
-import org.apache.seata.console.config.WebSecurityConfig;
+import org.apache.seata.console.config.ConsoleSecurityConfig;
 import org.apache.seata.console.security.User;
 import org.apache.seata.console.utils.JwtTokenUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -31,6 +34,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import javax.servlet.http.HttpServletResponse;
 
 import javax.servlet.http.HttpServletResponse;
 
@@ -39,11 +43,15 @@ import javax.servlet.http.HttpServletResponse;
  *
  */
 @RestController
+@Api(tags = "Console authentication APIs")
 @RequestMapping("/api/v1/auth")
 public class AuthController {
     @Autowired
+    @Qualifier("consoleJwtTokenUtils")
     private JwtTokenUtils jwtTokenUtils;
+
     @Autowired
+    @Qualifier("consoleAuthenticationManager")
     private AuthenticationManager authenticationManager;
 
     /**
@@ -54,25 +62,27 @@ public class AuthController {
      * @return HTTP code equal to 200 indicates that Seata is in right states. HTTP code equal to 500 indicates that
      * Seata is in broken states.
      */
+    @ApiOperation("login and get access token and refresh token")
     @PostMapping("/login")
     public SingleResult<String> login(HttpServletResponse response, @RequestBody User user) {
         UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
-            user.getUsername(), user.getPassword());
+                user.getUsername(), user.getPassword());
         try {
             //AuthenticationManager(default ProviderManager) #authenticate check Authentication
             Authentication authentication = authenticationManager.authenticate(authenticationToken);
             //bind authentication to securityContext
             SecurityContextHolder.getContext().setAuthentication(authentication);
             //create token
-            String token = jwtTokenUtils.createToken(authentication);
+            String accessToken = jwtTokenUtils.createAccessToken(authentication);
+            String refreshToken = jwtTokenUtils.createRefreshToken(authentication);
 
-            String authHeader = WebSecurityConfig.TOKEN_PREFIX + token;
+            String authHeader = ConsoleSecurityConfig.TOKEN_PREFIX + accessToken;
             //put token into http header
-            response.addHeader(WebSecurityConfig.AUTHORIZATION_HEADER, authHeader);
-
-            return SingleResult.success(authHeader);
+            response.addHeader(ConsoleSecurityConfig.AUTHORIZATION_HEADER, authHeader);
+            response.addHeader(ConsoleSecurityConfig.REFRESH_TOKEN, refreshToken);
+            return new SingleResult<>(Code.SUCCESS, authHeader);
         } catch (BadCredentialsException authentication) {
-            return SingleResult.failure(Code.LOGIN_FAILED);
+            return new SingleResult<>(Code.LOGIN_FAILED);
         }
     }
 }

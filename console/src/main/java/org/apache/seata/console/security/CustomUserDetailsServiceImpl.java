@@ -16,20 +16,19 @@
  */
 package org.apache.seata.console.security;
 
-import javax.annotation.PostConstruct;
-
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+import javax.annotation.PostConstruct;
 
 /**
  * Custem user service
  *
  */
-@Service
+@Service("consoleUserDetailsService")
 public class CustomUserDetailsServiceImpl implements UserDetailsService {
 
     @Value("${console.user.username}")

@@ -16,19 +16,13 @@
  */
 package org.apache.seata.console.utils;
 
-import java.util.Date;
-import java.util.List;
-
-import javax.crypto.spec.SecretKeySpec;
-
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.MalformedJwtException;
 import io.jsonwebtoken.SignatureAlgorithm;
-import io.jsonwebtoken.UnsupportedJwtException;
 import io.jsonwebtoken.io.Decoders;
-import io.jsonwebtoken.security.SignatureException;
+import org.apache.seata.common.result.Code;
+import org.apache.seata.common.result.SingleResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -38,12 +32,15 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.stereotype.Component;
+import javax.crypto.spec.SecretKeySpec;
+import java.util.Date;
+import java.util.List;
 
 /**
  * Jwt token tool
  *
  */
-@Component
+@Component("consoleJwtTokenUtils")
 public class JwtTokenUtils {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(JwtTokenUtils.class);
@@ -53,22 +50,48 @@ public class JwtTokenUtils {
     /**
      * secret key
      */
-    @Value("${seata.security.secretKey}")
+    @Value("${console.secretKey}")
     private String secretKey;
 
     /**
-     * Token validity time(ms)
+     * Access token validity time(ms)
      */
-    @Value("${seata.security.tokenValidityInMilliseconds}")
-    private long tokenValidityInMilliseconds;
+    @Value("${console.accessTokenValidityInMilliseconds}")
+    private long accessTokenValidityInMilliseconds;
 
     /**
-     * Create token
+     * Refresh token validity time(ms)
+     */
+    @Value("${console.refreshTokenValidityInMilliseconds}")
+    private long refreshTokenValidityInMilliseconds;
+
+    /**
+     * Create access token
      *
      * @param authentication auth info
      * @return token string
      */
-    public String createToken(Authentication authentication) {
+    public String createAccessToken(Authentication authentication) {
+        return createToken(authentication, accessTokenValidityInMilliseconds);
+    }
+
+    /**
+     * Create refresh token
+     *
+     * @param authentication auth info
+     * @return token string
+     */
+    public String createRefreshToken(Authentication authentication) {
+        return createToken(authentication, refreshTokenValidityInMilliseconds);
+    }
+
+    /**
+     * Create token
+     * @param authentication auth info
+     * @param tokenValidityInMilliseconds token validity time in milliseconds
+     * @return token string
+     */
+    private String createToken(Authentication authentication, long tokenValidityInMilliseconds) {
         /**
          * Current time
          */
@@ -81,59 +104,72 @@ public class JwtTokenUtils {
          * Key
          */
         SecretKeySpec secretKeySpec = new SecretKeySpec(Decoders.BASE64.decode(secretKey),
-            SignatureAlgorithm.HS256.getJcaName());
+                SignatureAlgorithm.HS256.getJcaName());
         /**
          * create token
          */
-        return Jwts.builder().setSubject(authentication.getName()).claim(AUTHORITIES_KEY, "").setExpiration(
-            expirationDate).signWith(secretKeySpec, SignatureAlgorithm.HS256).compact();
+        return Jwts.builder().setSubject(authentication.getName()).claim(AUTHORITIES_KEY, "")
+                .setExpiration(expirationDate).signWith(secretKeySpec, SignatureAlgorithm.HS256).compact();
     }
 
     /**
-     * Get auth Info
+     * validate access token
      *
      * @param token token
-     * @return auth info
+     * @return validate result
      */
-    public Authentication getAuthentication(String token) {
-        /**
-         *  parse the payload of token
-         */
-        Claims claims = Jwts.parser().setSigningKey(secretKey).parseClaimsJws(token).getBody();
-
-        List<GrantedAuthority> authorities = AuthorityUtils.commaSeparatedStringToAuthorityList(
-            (String)claims.get(AUTHORITIES_KEY));
-
-        User principal = new User(claims.getSubject(), "", authorities);
-        return new UsernamePasswordAuthenticationToken(principal, "", authorities);
-    }
-
-    /**
-     * validate token
-     *
-     * @param token token
-     * @return whether valid
-     */
-    public boolean validateToken(String token) {
+    public SingleResult validateAccessToken(String token) {
         try {
-            Jwts.parser().setSigningKey(secretKey).parseClaimsJws(token);
-            return true;
-        } catch (SignatureException e) {
-            LOGGER.warn("Invalid JWT signature.");
-            LOGGER.trace("Invalid JWT signature trace: {}", e);
-        } catch (MalformedJwtException e) {
-            LOGGER.warn("Invalid JWT token.");
-            LOGGER.trace("Invalid JWT token trace: {}", e);
+            /**
+             *  parse the payload of access token
+             */
+            Claims claims = Jwts.parser().setSigningKey(secretKey).parseClaimsJws(token).getBody();
+            List<GrantedAuthority> authorities = AuthorityUtils.commaSeparatedStringToAuthorityList(
+                    (String)claims.get(AUTHORITIES_KEY));
+            User principal = new User(claims.getSubject(), "", authorities);
+            UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(principal, "", authorities);
+            if (System.currentTimeMillis() > claims.getExpiration().getTime() - accessTokenValidityInMilliseconds / 3) {
+                LOGGER.warn("jwt token will be expired, need refresh token");
+                return new SingleResult<>(Code.ACCESS_TOKEN_NEAR_EXPIRATION, authenticationToken);
+            }
+            return new SingleResult<>(Code.SUCCESS, authenticationToken);
         } catch (ExpiredJwtException e) {
             LOGGER.warn("Expired JWT token.");
             LOGGER.trace("Expired JWT token trace: {}", e);
-        } catch (UnsupportedJwtException e) {
+            return new SingleResult<>(Code.ACCESS_TOKEN_EXPIRED);
+        } catch (Exception e) {
             LOGGER.warn("Unsupported JWT token.");
             LOGGER.trace("Unsupported JWT token trace: {}", e);
-        } catch (IllegalArgumentException e) {
-            LOGGER.warn("JWT token compact of handler are invalid.");
-            LOGGER.trace("JWT token compact of handler are invalid trace: {}", e);
+            return new SingleResult<>(Code.CHECK_TOKEN_FAILED);
         }
-        return false;
     }
+
+    /**
+     * validate refresh token
+     *
+     * @param token token
+     * @return validate result
+     */
+    public SingleResult validateRefreshToken(String token) {
+        try {
+            /**
+             *  parse the payload of refresh token
+             */
+            Claims claims = Jwts.parser().setSigningKey(secretKey).parseClaimsJws(token).getBody();
+            List<GrantedAuthority> authorities = AuthorityUtils.commaSeparatedStringToAuthorityList(
+                    (String)claims.get(AUTHORITIES_KEY));
+            User principal = new User(claims.getSubject(), "", authorities);
+            UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(principal, "", authorities);
+            return new SingleResult<>(Code.SUCCESS, authenticationToken);
+        } catch (ExpiredJwtException e) {
+            LOGGER.warn("Expired JWT token.");
+            LOGGER.trace("Expired JWT token trace: {}", e);
+            return new SingleResult<>(Code.REFRESH_TOKEN_EXPIRED);
+        } catch (Exception e) {
+            LOGGER.warn("Invalid JWT token.");
+            LOGGER.trace("Invalid JWT token trace: {}", e);
+            return new SingleResult<>(Code.CHECK_TOKEN_FAILED);
+        }
+    }
+
 }
