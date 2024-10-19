@@ -56,6 +56,9 @@ public class ConsoleAuthenticationTokenFilter extends OncePerRequestFilter {
         String refreshToken = resolveRefreshToken(request);
         SingleResult result = new SingleResult(Code.CHECK_TOKEN_FAILED);
         ObjectMapper objectMapper = new ObjectMapper();
+        System.out.println("Into console filter");
+        System.out.println("accessToken is " + accessToken);
+        System.out.println("refreshToken is " + refreshToken);
         if (accessToken != null) {
             result = this.tokenProvider.validateAccessToken(accessToken);
             if (result.getMessage().equals(Code.ACCESS_TOKEN_NEAR_EXPIRATION.getMsg())) {
@@ -66,6 +69,7 @@ public class ConsoleAuthenticationTokenFilter extends OncePerRequestFilter {
             result = this.tokenProvider.validateRefreshToken(refreshToken);
             if (result.getCode().equals(Code.SUCCESS.getCode())) {
                 //create access token
+                System.out.println("validateRefreshToken success, create accessToken");
                 String newAccessToken = this.tokenProvider.createAccessToken((UsernamePasswordAuthenticationToken)result.getData());
 
                 String authHeader = ConsoleSecurityConfig.TOKEN_PREFIX + newAccessToken;
@@ -73,6 +77,7 @@ public class ConsoleAuthenticationTokenFilter extends OncePerRequestFilter {
                 response.addHeader(ConsoleSecurityConfig.AUTHORIZATION_HEADER, authHeader);
             }
         }
+        System.out.println("result code is " + result.getCode());
         if (result.getCode().equals(Code.SUCCESS.getCode())) {
             /**
              * get auth info

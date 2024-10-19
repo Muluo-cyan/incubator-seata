@@ -80,6 +80,7 @@ public class AuthController {
             //put token into http header
             response.addHeader(ConsoleSecurityConfig.AUTHORIZATION_HEADER, authHeader);
             response.addHeader(ConsoleSecurityConfig.REFRESH_TOKEN, refreshToken);
+            System.out.println("login console success, return double token");
             return new SingleResult<>(Code.SUCCESS, authHeader);
         } catch (BadCredentialsException authentication) {
             return new SingleResult<>(Code.LOGIN_FAILED);

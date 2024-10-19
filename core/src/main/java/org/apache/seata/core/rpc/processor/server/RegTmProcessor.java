@@ -59,6 +59,7 @@ public class RegTmProcessor implements RemotingProcessor {
         String ipAndPort = NetUtil.toStringAddress(ctx.channel().remoteAddress());
         Version.putChannelVersion(ctx.channel(), message.getVersion());
         RegisterTMResponse response = new RegisterTMResponse(false);
+        System.out.println("onRegTmMessage");
         try {
             AuthResult authResult = (checkAuthHandler != null) ? checkAuthHandler.regTransactionManagerCheckAuth(message) : null;
             if (checkAuthHandler == null || authResult.getResultCode().equals(ResultCode.Success)

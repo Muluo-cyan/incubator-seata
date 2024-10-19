@@ -201,6 +201,7 @@ public class RaftRegistryServiceImpl implements RegistryService<ConfigChangeList
                             } catch (RetryableException e) {
                                 LOGGER.error(e.getMessage(), e);
                                 try {
+                                    System.out.println("重试");
                                     Thread.sleep(1000);
                                 } catch (InterruptedException ignored) {
                                 }
@@ -297,6 +298,7 @@ public class RaftRegistryServiceImpl implements RegistryService<ConfigChangeList
         groupTerms.forEach((k, v) -> param.put(k, String.valueOf(v)));
         for (String group : groupTerms.keySet()) {
             String tcAddress = queryHttpAddress(clusterName, group);
+            System.out.println("start watch:" + tcAddress);
             addAuthDataToHeader(header, tcAddress);
             try (CloseableHttpResponse httpResponse =
                          HttpClientUtil.doPost("http://" + tcAddress + "/metadata/v1/watch", param, header, 30000)) {
@@ -347,6 +349,7 @@ public class RaftRegistryServiceImpl implements RegistryService<ConfigChangeList
             Map<String, String> param = new HashMap<>();
             param.put("group", group);
             String response = null;
+            System.out.println("start acquireClusterMetaData:" + tcAddress);
             try (CloseableHttpResponse httpResponse =
                          HttpClientUtil.doGet("http://" + tcAddress + "/metadata/v1/cluster", param, header, 1000)) {
                 if (httpResponse != null) {
@@ -379,6 +382,7 @@ public class RaftRegistryServiceImpl implements RegistryService<ConfigChangeList
         Map<String, String> header = new HashMap<>();
         header.put(HTTP.CONTENT_TYPE, ContentType.APPLICATION_JSON.getMimeType());
         String response;
+        System.out.println("login to " + tcAddress);
         try (CloseableHttpResponse httpResponse =
                      HttpClientUtil.doPost("http://" + tcAddress + "/metadata/v1/auth/login", param, header, 1000)) {
             if (httpResponse != null) {
@@ -429,6 +433,7 @@ public class RaftRegistryServiceImpl implements RegistryService<ConfigChangeList
                 INIT_ADDRESSES.put(clusterName, list);
                 // init jwt token
                 try {
+                    System.out.println("lookup and http");
                     refreshDoubleToken(queryHttpAddress(clusterName, key));
                 } catch (Exception e) {
                     throw new RuntimeException("Init fetch token failed!", e);
@@ -439,6 +444,7 @@ public class RaftRegistryServiceImpl implements RegistryService<ConfigChangeList
             }
         }
         List<Node> nodes = METADATA.getNodes(clusterName);
+        System.out.println("lookup but no http");
         if (CollectionUtils.isNotEmpty(nodes)) {
             return nodes.parallelStream().map(this::convertInetSocketAddress).collect(Collectors.toList());
         }
@@ -461,9 +467,11 @@ public class RaftRegistryServiceImpl implements RegistryService<ConfigChangeList
                     refreshToken = null;
                 } else if (message.equals(Code.ACCESS_TOKEN_EXPIRED.getMsg())) {
                     accessToken = null;
+                    System.out.println("accessToken过期");
                 }
                 else if (message.equals(Code.REFRESH_TOKEN_EXPIRED.getMsg())) {
                     refreshToken = null;
+                    System.out.println("refreshToken过期");
                 }
             }
             if ((StringUtils.isNotBlank(USERNAME) && StringUtils.isNotBlank(PASSWORD))
@@ -477,11 +485,13 @@ public class RaftRegistryServiceImpl implements RegistryService<ConfigChangeList
             Header header = httpResponse.getFirstHeader(ACCESS_TOKEN_EXPIRATION_HEADER);
             if ( header != null && header.getValue().equals("true")) {
                 isAccessTokenNearExpiration = true;
+                System.out.println("accessToken即将过期");
             }
             Header newAccessTokenHeader = httpResponse.getFirstHeader(AUTHORIZATION_HEADER);
             if (newAccessTokenHeader != null && StringUtils.isNotBlank(newAccessTokenHeader.getValue())) {
                 accessToken = newAccessTokenHeader.getValue();
                 isAccessTokenNearExpiration = false;
+                System.out.println("刷新accessToken");
             }
         }
         return response;
@@ -495,12 +505,16 @@ public class RaftRegistryServiceImpl implements RegistryService<ConfigChangeList
      */
     private static void addAuthDataToHeader(Map<String, String> header, String tcAddress) throws RetryableException {
         if (StringUtils.isNotBlank(accessToken) && !isAccessTokenNearExpiration) {
+            System.out.println("不需要刷新，直接用accessToken:" + accessToken);
             header.put(AUTHORIZATION_HEADER, accessToken);
         } else if (refreshToken != null) {
+            System.out.println("需要refreshToken刷新，用refreshToken请求" + refreshToken);
             header.put(PRO_REFRESH_TOKEN, refreshToken);
         } else {
+            System.out.println("需要重新登录刷新两个token");
             refreshDoubleToken(tcAddress);
             if (StringUtils.isNotBlank(accessToken)) {
+                System.out.println("刷新后用accessToken进行请求");
                 header.put(AUTHORIZATION_HEADER, accessToken);
             }
         }

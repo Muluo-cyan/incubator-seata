@@ -58,6 +58,7 @@ public class RegRmProcessor implements RemotingProcessor {
         RegisterRMRequest message = (RegisterRMRequest) rpcMessage.getBody();
         String ipAndPort = NetUtil.toStringAddress(ctx.channel().remoteAddress());
         RegisterRMResponse response = new RegisterRMResponse(false);
+        System.out.println("onRegRmMessage");
         try {
             AuthResult authResult = (checkAuthHandler != null) ? checkAuthHandler.regResourceManagerCheckAuth(message) : null;
             if (checkAuthHandler == null || authResult.getResultCode().equals(ResultCode.Success)

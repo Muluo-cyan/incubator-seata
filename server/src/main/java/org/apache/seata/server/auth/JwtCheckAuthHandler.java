@@ -59,6 +59,7 @@ public class JwtCheckAuthHandler extends AbstractCheckAuthHandler {
         String password = extraDataMap.get(PRO_PASSWORD);
         String accessToken = extraDataMap.get(PRO_TOKEN);
         String refreshToken = extraDataMap.get(PRO_REFRESH_TOKEN);
+        System.out.println("checkAuthData:" + extraDataMap);
         if (username != null && password != null) {
             return jwtTokenUtils.checkUsernamePassword(username, password);
         } else if (accessToken != null) {

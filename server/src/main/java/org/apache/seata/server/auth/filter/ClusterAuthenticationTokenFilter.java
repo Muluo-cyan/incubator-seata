@@ -57,6 +57,9 @@ public class ClusterAuthenticationTokenFilter extends OncePerRequestFilter {
         String refreshToken = resolveRefreshToken(request);
         SingleResult result = new SingleResult(Code.CHECK_TOKEN_FAILED);
         ObjectMapper objectMapper = new ObjectMapper();
+        System.out.println("Into cluster filter");
+        System.out.println("accessToken is " + accessToken);
+        System.out.println("refreshToken is " + refreshToken);
         if (accessToken != null) {
             result = this.tokenProvider.validateAccessToken(accessToken);
             if (result.getMessage().equals(Code.ACCESS_TOKEN_NEAR_EXPIRATION.getMsg())) {
@@ -66,6 +69,7 @@ public class ClusterAuthenticationTokenFilter extends OncePerRequestFilter {
         } else if (refreshToken != null) {
             result = this.tokenProvider.validateRefreshToken(refreshToken);
             if (result.getCode().equals(Code.SUCCESS.getCode())) {
+                System.out.println("validateRefreshToken success, create accessToken");
                 //create access token
                 String newAccessToken = this.tokenProvider.createAccessToken((UsernamePasswordAuthenticationToken)result.getData());
 
